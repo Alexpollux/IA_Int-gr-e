@@ -1,89 +1,119 @@
-"use client";
-
+import React, { useState } from "react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
-import { arrayMove, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { SortableItem } from "./SortableItem";
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import SortableItem from "./SortableItem";
 
 export default function EditSections({
   sections,
   setSections,
+  mode,
+  onExitEditMode,
 }: {
-  sections: { title: string; description: string; objectives: string }[];
-  setSections: (updatedSections: { title: string; description: string; objectives: string }[]) => void;
+  sections: any[];
+  setSections: (updatedSections: any[]) => void;
+  mode: "order" | "content";
+  onExitEditMode: () => void;
 }) {
+  const [draftSections, setDraftSections] = useState(
+    sections.map((section, index) => ({
+      ...section,
+      id: section.id || `section-${index}`, // Assure un id unique
+    }))
+  );
+
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
+    if (active.id !== over.id) {
+      const oldIndex = draftSections.findIndex((section) => section.id === active.id);
+      const newIndex = draftSections.findIndex((section) => section.id === over.id);
+      const updatedSections = arrayMove(draftSections, oldIndex, newIndex);
+      setDraftSections(updatedSections);
+      setSections(updatedSections); // Update parent state
+    }
+  };
 
-    if (!over || active.id === over.id) return;
+  const handleChange = (index: number, field: string, value: string) => {
+    const updatedSections = [...draftSections];
+    updatedSections[index][field] = value;
+    setDraftSections(updatedSections);
+    setSections(updatedSections); // Update parent state
+  };
 
-    const oldIndex = sections.findIndex((section) => section.title === active.id);
-    const newIndex = sections.findIndex((section) => section.title === over.id);
-
-    const reorderedSections = arrayMove(sections, oldIndex, newIndex);
-    setSections(reorderedSections);
+  const handleAddSection = () => {
+    const newSection = {
+      id: `section-${draftSections.length}`,
+      title: "Nouvelle section",
+      description: "",
+      objectives: [],
+    };
+    const updatedSections = [...draftSections, newSection];
+    setDraftSections(updatedSections);
+    setSections(updatedSections); // Update parent state
   };
 
   return (
-    <div className="mt-6">
-      <h2 className="text-xl font-bold mb-2">Édition et Personnalisation :</h2>
-      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={sections.map((section) => section.title)} strategy={verticalListSortingStrategy}>
-          {sections.map((section, index) => (
-            <SortableItem key={section.title} id={section.title}>
-              <div className="mb-4 border p-4 rounded-lg bg-gray-50">
-                <input
-                  type="text"
-                  value={section.title}
-                  onChange={(e) => {
-                    const updatedSections = [...sections];
-                    updatedSections[index].title = e.target.value;
-                    setSections(updatedSections);
-                  }}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 mb-2"
-                  placeholder="Titre"
-                />
-                <textarea
-                  value={section.description}
-                  onChange={(e) => {
-                    const updatedSections = [...sections];
-                    updatedSections[index].description = e.target.value;
-                    setSections(updatedSections);
-                  }}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 mb-2"
-                  placeholder="Description"
-                />
-                <textarea
-                  value={section.objectives}
-                  onChange={(e) => {
-                    const updatedSections = [...sections];
-                    updatedSections[index].objectives = e.target.value;
-                    setSections(updatedSections);
-                  }}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                  placeholder="Objectifs"
-                />
-                <button
-                  onClick={() => {
-                    const updatedSections = sections.filter((_, i) => i !== index);
-                    setSections(updatedSections);
-                  }}
-                  className="mt-2 bg-red-500 text-white rounded-lg px-4 py-2 hover:bg-red-600"
-                >
-                  Supprimer
-                </button>
-              </div>
-            </SortableItem>
-          ))}
-        </SortableContext>
-      </DndContext>
-      <button
-        onClick={() =>
-          setSections([...sections, { title: `Section ${sections.length + 1}`, description: "", objectives: "" }])
-        }
-        className="mt-4 bg-blue-500 text-white rounded-lg px-4 py-2 hover:bg-blue-600"
-      >
-        Ajouter une Section
-      </button>
+    <div>
+      {mode === "order" ? (
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={draftSections.map((section) => section.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {draftSections.map((section) => (
+              <SortableItem key={section.id} id={section.id}>
+                <div className="border p-4 mb-4 rounded-lg bg-gray-100">
+                  <h3 className="text-lg font-bold">{section.title}</h3>
+                  <p>{section.description || "Pas de description"}</p>
+                </div>
+              </SortableItem>
+            ))}
+          </SortableContext>
+        </DndContext>
+      ) : (
+        draftSections.map((section, index) => (
+          <div key={section.id} className="mb-4 border p-4 rounded-lg bg-gray-100">
+            <input
+              type="text"
+              value={section.title}
+              onChange={(e) => handleChange(index, "title", e.target.value)}
+              placeholder="Titre"
+              className="w-full border rounded-lg px-4 py-2 mb-2"
+            />
+            <textarea
+              value={section.description}
+              onChange={(e) => handleChange(index, "description", e.target.value)}
+              placeholder="Description"
+              className="w-full border rounded-lg px-4 py-2 mb-2"
+            />
+            <textarea
+              value={section.objectives.join(", ")}
+              onChange={(e) =>
+                handleChange(index, "objectives", e.target.value.split(","))
+              }
+              placeholder="Objectifs (séparés par des virgules)"
+              className="w-full border rounded-lg px-4 py-2 mb-2"
+            />
+          </div>
+        ))
+      )}
+      <div className="flex justify-center mt-4 space-x-4">
+        <button
+          onClick={handleAddSection}
+          className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"
+        >
+          Ajouter une section
+        </button>
+        <button
+          onClick={onExitEditMode}
+          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+        >
+          Sortir de l'édition
+        </button>
+      </div>
     </div>
   );
 }
